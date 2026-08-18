@@ -9,15 +9,21 @@ export default defineConfig({
       registerType: 'autoUpdate',
       includeAssets: ['roulette.svg'],
       manifest: {
+        id: '/',
         name: 'Roulette Analyser',
         short_name: 'Roulette',
         description: 'Analyseer roulette reeksen op wielsectoren en fysieke vijf-vaks clusters.',
-        theme_color: '#0d5c3d',
-        background_color: '#071d16',
+        theme_color: '#061710',
+        background_color: '#061710',
         display: 'standalone',
-        start_url: '.',
+        display_override: ['standalone', 'minimal-ui'],
+        orientation: 'portrait-primary',
+        start_url: '/',
+        scope: '/',
+        categories: ['utilities'],
         icons: [
-          { src: 'roulette.svg', sizes: 'any', type: 'image/svg+xml', purpose: 'any maskable' }
+          { src: 'roulette.svg', sizes: 'any', type: 'image/svg+xml', purpose: 'any' },
+          { src: 'roulette.svg', sizes: 'any', type: 'image/svg+xml', purpose: 'maskable' }
         ]
       }
     })

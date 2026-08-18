@@ -1,4 +1,5 @@
 export type Sector = 'Q1' | 'Q2' | 'Q3' | 'Q4'
+export type RacetrackBetName = 'Voisins du Zéro' | 'Tiers du Cylindre' | 'Orphelins' | 'Jeu Zéro'
 
 export const WHEEL = [0,32,15,19,4,21,2,25,17,34,6,27,13,36,11,30,8,23,10,5,24,16,33,1,20,14,31,9,22,18,29,7,28,12,35,3,26] as const
 
@@ -7,6 +8,13 @@ export const SECTORS: Record<Sector, readonly number[]> = {
   Q2: [21,2,25,17,34,6,27,13,36],
   Q3: [11,30,8,23,10,5,24,16,33],
   Q4: [1,20,14,31,9,22,18,29,7,28],
+}
+
+export const RACETRACK_BETS: Record<RacetrackBetName, { numbers: readonly number[]; chips: number; shortName: string }> = {
+  'Voisins du Zéro': { numbers: [22,18,29,7,28,12,35,3,26,0,32,15,19,4,21,2,25], chips: 9, shortName: 'Voisins' },
+  'Tiers du Cylindre': { numbers: [27,13,36,11,30,8,23,10,5,24,16,33], chips: 6, shortName: 'Tiers' },
+  'Orphelins': { numbers: [1,20,14,31,9,17,34,6], chips: 5, shortName: 'Orphelins' },
+  'Jeu Zéro': { numbers: [12,35,3,26,0,32,15], chips: 4, shortName: 'Zero' },
 }
 
 export const RANDOM_FIVE_HIT_RATE = 5 / 37 * 100
@@ -36,6 +44,16 @@ export const clusterAround = (center: number) => {
 const confidence = (n: number) => n < 3 ? 'Zeer zwak' : n <= 5 ? 'Zwak' : n <= 10 ? 'Voorlopig' : n <= 20 ? 'Redelijk patroon' : 'Sterker patroon'
 
 export interface SectorStat { sector: Sector; count: number; percentage: number }
+export interface RacetrackRecommendation {
+  name: RacetrackBetName
+  shortName: string
+  numbers: readonly number[]
+  chips: number
+  overlap: number[]
+  overlapCount: number
+  overlapPercentage: number
+  reason: string
+}
 
 export interface Prediction {
   currentNumber: number
@@ -46,6 +64,7 @@ export interface Prediction {
   confidence: string
   center: number
   numbers: number[]
+  alternative: RacetrackRecommendation
 }
 
 export interface BacktestRow {
@@ -72,6 +91,45 @@ export interface BacktestResult {
   percentagePointDelta: number
   relativeLift: number
   rows: BacktestRow[]
+}
+
+function recommendRacetrackBet(cluster: number[], center: number): RacetrackRecommendation {
+  const zero = RACETRACK_BETS['Jeu Zéro']
+  const zeroOverlap = cluster.filter(n => zero.numbers.includes(n))
+
+  // Jeu Zéro is a subset of Voisins. Prefer the tighter Zero bet when the predicted
+  // five-pocket cluster itself is clearly concentrated around zero.
+  if (zeroOverlap.length >= 3 && zero.numbers.includes(center)) {
+    return {
+      name: 'Jeu Zéro', shortName: zero.shortName, numbers: zero.numbers, chips: zero.chips,
+      overlap: zeroOverlap, overlapCount: zeroOverlap.length,
+      overlapPercentage: zeroOverlap.length / cluster.length * 100,
+      reason: `${zeroOverlap.length} van de 5 voorspelde pockets liggen in het compacte gebied rond 0.`,
+    }
+  }
+
+  const names: RacetrackBetName[] = ['Voisins du Zéro', 'Tiers du Cylindre', 'Orphelins']
+  const ranked = names.map(name => {
+    const bet = RACETRACK_BETS[name]
+    const overlap = cluster.filter(n => bet.numbers.includes(n))
+    const centerBonus = bet.numbers.includes(center) ? 0.25 : 0
+    // Primary signal is overlap with the five-pocket prediction. In ties prefer
+    // the more selective racetrack bet, then the one containing the center.
+    const selectivityBonus = 1 / bet.numbers.length
+    return { name, bet, overlap, score: overlap.length + centerBonus + selectivityBonus }
+  }).sort((a,b) => b.score-a.score)
+
+  const best = ranked[0]
+  return {
+    name: best.name,
+    shortName: best.bet.shortName,
+    numbers: best.bet.numbers,
+    chips: best.bet.chips,
+    overlap: best.overlap,
+    overlapCount: best.overlap.length,
+    overlapPercentage: best.overlap.length / cluster.length * 100,
+    reason: `${best.overlap.length} van de 5 voorspelde pockets vallen binnen ${best.bet.shortName}.`,
+  }
 }
 
 export function analyse(history: number[]): Prediction | null {
@@ -112,6 +170,7 @@ export function analyse(history: number[]): Prediction | null {
     return { center, cluster, score: targetHits * 10 + allHits * 2 + exact + bonus, targetHits, allHits }
   }).sort((a,b) => b.score-a.score || b.targetHits-a.targetHits || b.allHits-a.allHits || indexOf(a.center)-indexOf(b.center))
 
+  const best = candidates[0]
   return {
     currentNumber,
     currentSector,
@@ -119,8 +178,9 @@ export function analyse(history: number[]): Prediction | null {
     sectorStats,
     relevantTransitions,
     confidence: confidence(relevantTransitions),
-    center: candidates[0].center,
-    numbers: candidates[0].cluster,
+    center: best.center,
+    numbers: best.cluster,
+    alternative: recommendRacetrackBet(best.cluster, best.center),
   }
 }
 

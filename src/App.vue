@@ -106,6 +106,25 @@ function reset() {
           </div>
         </div>
 
+        <div class="racetrack-alternative">
+          <div class="alternative-head">
+            <div>
+              <span class="muted">Alternatief op racetrack</span>
+              <strong>{{ prediction.alternative.name }}</strong>
+            </div>
+            <span class="alt-chip-count">{{ prediction.alternative.chips }} fiches</span>
+          </div>
+          <p>{{ prediction.alternative.reason }}</p>
+          <div class="alternative-numbers">
+            <span
+              v-for="n in prediction.alternative.numbers"
+              :key="n"
+              :class="[{ overlap: prediction.alternative.overlap.includes(n) }, `alt-${rouletteColor(n)}`]"
+            >{{ n }}</span>
+          </div>
+          <small>{{ prediction.alternative.overlapCount }}/5 overlap met de primaire zone · {{ prediction.alternative.overlapPercentage.toFixed(0) }}%</small>
+        </div>
+
         <div class="confidence">
           <div><span class="muted">Confidence</span><strong>{{ prediction.confidence }}</strong></div>
           <div><span class="muted">Relevante overgangen</span><strong>{{ prediction.relevantTransitions }}</strong></div>

@@ -29,3 +29,7 @@ npm run build
 ```
 
 De PWA gebruikt `vite-plugin-pwa` met automatische service-worker updates en slaat de ingevoerde reeks lokaal op in de browser.
+
+## GitHub Pages
+
+Elke push naar `main` wordt via GitHub Actions gebouwd en gepubliceerd naar GitHub Pages.

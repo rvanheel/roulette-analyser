@@ -77,6 +77,22 @@ export interface BacktestRow {
   hit: boolean
   sectorHit: boolean
   relevantTransitions: number
+  racetrackName: RacetrackBetName
+  racetrackShortName: string
+  racetrackNumbers: readonly number[]
+  racetrackHit: boolean
+  racetrackBaseline: number
+}
+
+export interface RacetrackBacktestStat {
+  name: RacetrackBetName
+  shortName: string
+  predictions: number
+  hits: number
+  hitRate: number
+  baseline: number
+  delta: number
+  relativeLift: number
 }
 
 export interface BacktestResult {
@@ -90,6 +106,13 @@ export interface BacktestResult {
   expectedRandomHits: number
   percentagePointDelta: number
   relativeLift: number
+  racetrackHits: number
+  racetrackHitRate: number
+  racetrackExpectedHits: number
+  racetrackExpectedRate: number
+  racetrackDelta: number
+  racetrackRelativeLift: number
+  racetrackStats: RacetrackBacktestStat[]
   rows: BacktestRow[]
 }
 
@@ -97,8 +120,6 @@ function recommendRacetrackBet(cluster: number[], center: number): RacetrackReco
   const zero = RACETRACK_BETS['Jeu Zéro']
   const zeroOverlap = cluster.filter(n => zero.numbers.includes(n))
 
-  // Jeu Zéro is a subset of Voisins. Prefer the tighter Zero bet when the predicted
-  // five-pocket cluster itself is clearly concentrated around zero.
   if (zeroOverlap.length >= 3 && zero.numbers.includes(center)) {
     return {
       name: 'Jeu Zéro', shortName: zero.shortName, numbers: zero.numbers, chips: zero.chips,
@@ -113,8 +134,6 @@ function recommendRacetrackBet(cluster: number[], center: number): RacetrackReco
     const bet = RACETRACK_BETS[name]
     const overlap = cluster.filter(n => bet.numbers.includes(n))
     const centerBonus = bet.numbers.includes(center) ? 0.25 : 0
-    // Primary signal is overlap with the five-pocket prediction. In ties prefer
-    // the more selective racetrack bet, then the one containing the center.
     const selectivityBonus = 1 / bet.numbers.length
     return { name, bet, overlap, score: overlap.length + centerBonus + selectivityBonus }
   }).sort((a,b) => b.score-a.score)
@@ -194,6 +213,7 @@ export function backtest(history: number[], minimumTrainingSpins = 5): BacktestR
 
     const actual = history[targetIndex]
     const actualSector = sectorOf(actual)
+    const alt = prediction.alternative
     rows.push({
       index: targetIndex,
       actual,
@@ -204,6 +224,11 @@ export function backtest(history: number[], minimumTrainingSpins = 5): BacktestR
       hit: prediction.numbers.includes(actual),
       sectorHit: actualSector === prediction.predictedSector,
       relevantTransitions: prediction.relevantTransitions,
+      racetrackName: alt.name,
+      racetrackShortName: alt.shortName,
+      racetrackNumbers: alt.numbers,
+      racetrackHit: alt.numbers.includes(actual),
+      racetrackBaseline: alt.numbers.length / 37 * 100,
     })
   }
 
@@ -216,6 +241,33 @@ export function backtest(history: number[], minimumTrainingSpins = 5): BacktestR
   const percentagePointDelta = hitRate - RANDOM_FIVE_HIT_RATE
   const relativeLift = RANDOM_FIVE_HIT_RATE ? hitRate / RANDOM_FIVE_HIT_RATE : 0
 
+  const racetrackHits = rows.filter(row => row.racetrackHit).length
+  const racetrackHitRate = predictions ? racetrackHits / predictions * 100 : 0
+  const racetrackExpectedHits = rows.reduce((sum, row) => sum + row.racetrackNumbers.length / 37, 0)
+  const racetrackExpectedRate = predictions ? racetrackExpectedHits / predictions * 100 : 0
+  const racetrackDelta = racetrackHitRate - racetrackExpectedRate
+  const racetrackRelativeLift = racetrackExpectedRate ? racetrackHitRate / racetrackExpectedRate : 0
+
+  const names = Object.keys(RACETRACK_BETS) as RacetrackBetName[]
+  const racetrackStats = names.map(name => {
+    const subset = rows.filter(row => row.racetrackName === name)
+    const bet = RACETRACK_BETS[name]
+    const count = subset.length
+    const betHits = subset.filter(row => row.racetrackHit).length
+    const rate = count ? betHits / count * 100 : 0
+    const baseline = bet.numbers.length / 37 * 100
+    return {
+      name,
+      shortName: bet.shortName,
+      predictions: count,
+      hits: betHits,
+      hitRate: rate,
+      baseline,
+      delta: rate - baseline,
+      relativeLift: baseline ? rate / baseline : 0,
+    }
+  })
+
   return {
     predictions,
     hits,
@@ -227,6 +279,13 @@ export function backtest(history: number[], minimumTrainingSpins = 5): BacktestR
     expectedRandomHits,
     percentagePointDelta,
     relativeLift,
+    racetrackHits,
+    racetrackHitRate,
+    racetrackExpectedHits,
+    racetrackExpectedRate,
+    racetrackDelta,
+    racetrackRelativeLift,
+    racetrackStats,
     rows,
   }
 }

@@ -116,11 +116,7 @@ function reset() {
           </div>
           <p>{{ prediction.alternative.reason }}</p>
           <div class="alternative-numbers">
-            <span
-              v-for="n in prediction.alternative.numbers"
-              :key="n"
-              :class="[{ overlap: prediction.alternative.overlap.includes(n) }, `alt-${rouletteColor(n)}`]"
-            >{{ n }}</span>
+            <span v-for="n in prediction.alternative.numbers" :key="n" :class="[{ overlap: prediction.alternative.overlap.includes(n) }, `alt-${rouletteColor(n)}`]">{{ n }}</span>
           </div>
           <small>{{ prediction.alternative.overlapCount }}/5 overlap met de primaire zone · {{ prediction.alternative.overlapPercentage.toFixed(0) }}%</small>
         </div>
@@ -151,51 +147,55 @@ function reset() {
       </div>
 
       <div class="backtest-kpis">
-        <div class="kpi hero-kpi">
-          <span class="muted">5-getallen hit-rate</span>
-          <strong>{{ backtestResult.hitRate.toFixed(1) }}%</strong>
-          <small>{{ backtestResult.hits }} hits / {{ backtestResult.predictions }} voorspellingen</small>
-        </div>
-        <div class="kpi">
-          <span class="muted">Willekeurige 5 baseline</span>
-          <strong>{{ backtestResult.randomHitRate.toFixed(2) }}%</strong>
-          <small>5 / 37 per spin</small>
-        </div>
-        <div class="kpi" :class="backtestResult.percentagePointDelta >= 0 ? 'positive' : 'negative'">
-          <span class="muted">Verschil</span>
-          <strong>{{ signed(backtestResult.percentagePointDelta) }} pp</strong>
-          <small>{{ backtestResult.relativeLift.toFixed(2) }}× baseline</small>
-        </div>
-        <div class="kpi">
-          <span class="muted">Sector geraakt</span>
-          <strong>{{ backtestResult.sectorHitRate.toFixed(1) }}%</strong>
-          <small>{{ backtestResult.sectorHits }} van {{ backtestResult.predictions }}</small>
-        </div>
+        <div class="kpi hero-kpi"><span class="muted">5-getallen hit-rate</span><strong>{{ backtestResult.hitRate.toFixed(1) }}%</strong><small>{{ backtestResult.hits }} hits / {{ backtestResult.predictions }} voorspellingen</small></div>
+        <div class="kpi"><span class="muted">Willekeurige 5 baseline</span><strong>{{ backtestResult.randomHitRate.toFixed(2) }}%</strong><small>5 / 37 per spin</small></div>
+        <div class="kpi" :class="backtestResult.percentagePointDelta >= 0 ? 'positive' : 'negative'"><span class="muted">Verschil</span><strong>{{ signed(backtestResult.percentagePointDelta) }} pp</strong><small>{{ backtestResult.relativeLift.toFixed(2) }}× baseline</small></div>
+        <div class="kpi"><span class="muted">Sector geraakt</span><strong>{{ backtestResult.sectorHitRate.toFixed(1) }}%</strong><small>{{ backtestResult.sectorHits }} van {{ backtestResult.predictions }}</small></div>
       </div>
 
       <div class="baseline-track">
         <div class="baseline-labels"><span>Random {{ backtestResult.randomHitRate.toFixed(2) }}%</span><span>Model {{ backtestResult.hitRate.toFixed(1) }}%</span></div>
-        <div class="baseline-bar">
-          <i class="random-mark" :style="{ left: `${Math.min(backtestResult.randomHitRate, 100)}%` }" />
-          <b :style="{ width: `${Math.min(backtestResult.hitRate, 100)}%` }" />
-        </div>
+        <div class="baseline-bar"><i class="random-mark" :style="{ left: `${Math.min(backtestResult.randomHitRate, 100)}%` }" /><b :style="{ width: `${Math.min(backtestResult.hitRate, 100)}%` }" /></div>
         <p class="hint">Bij {{ backtestResult.predictions }} voorspellingen verwacht willekeurig kiezen gemiddeld {{ backtestResult.expectedRandomHits.toFixed(1) }} hits.</p>
+      </div>
+
+      <div class="racetrack-backtest">
+        <div class="card-title-row compact-row">
+          <div><p class="label">Racetrack backtest</p><h2>Alternatief advies</h2></div>
+          <span class="muted">baseline wordt per geadviseerde groep gewogen</span>
+        </div>
+        <div class="backtest-kpis racetrack-kpis">
+          <div class="kpi hero-kpi"><span class="muted">Racetrack hit-rate</span><strong>{{ backtestResult.racetrackHitRate.toFixed(1) }}%</strong><small>{{ backtestResult.racetrackHits }} hits / {{ backtestResult.predictions }}</small></div>
+          <div class="kpi"><span class="muted">Gewogen baseline</span><strong>{{ backtestResult.racetrackExpectedRate.toFixed(1) }}%</strong><small>{{ backtestResult.racetrackExpectedHits.toFixed(1) }} verwachte hits</small></div>
+          <div class="kpi" :class="backtestResult.racetrackDelta >= 0 ? 'positive' : 'negative'"><span class="muted">Verschil</span><strong>{{ signed(backtestResult.racetrackDelta) }} pp</strong><small>{{ backtestResult.racetrackRelativeLift.toFixed(2) }}× baseline</small></div>
+        </div>
+
+        <div class="racetrack-stat-grid">
+          <div v-for="stat in backtestResult.racetrackStats" :key="stat.name" class="racetrack-stat" :class="{ inactive: !stat.predictions }">
+            <div><strong>{{ stat.shortName }}</strong><span>{{ stat.predictions }}× geadviseerd</span></div>
+            <div class="racetrack-rates"><b>{{ stat.hitRate.toFixed(1) }}%</b><small>baseline {{ stat.baseline.toFixed(1) }}%</small></div>
+            <div class="bar"><i :style="{ width: `${Math.min(stat.hitRate, 100)}%` }" /></div>
+            <small>{{ stat.hits }} hits · {{ signed(stat.delta) }} pp</small>
+          </div>
+        </div>
       </div>
 
       <div class="backtest-table-wrap">
         <table class="backtest-table">
-          <thead><tr><th>Werkelijk</th><th>Voorspeld</th><th>5-zone</th><th>Resultaat</th></tr></thead>
+          <thead><tr><th>Werkelijk</th><th>Sector</th><th>5-zone</th><th>5-resultaat</th><th>Racetrack</th><th>Alt.</th></tr></thead>
           <tbody>
             <tr v-for="row in recentBacktestRows" :key="row.index">
               <td><span class="mini-ball table-ball" :class="`num-${rouletteColor(row.actual)}`">{{ row.actual }}</span> <small>{{ row.actualSector }}</small></td>
               <td><span class="sector-badge" :class="sectorClass(row.predictedSector)">{{ row.predictedSector }}</span></td>
               <td class="zone-cell"><span v-for="n in row.numbers" :key="n" :class="{ 'zone-center': n === row.center }">{{ n }}</span></td>
               <td><strong :class="row.hit ? 'hit' : 'miss'">{{ row.hit ? 'HIT' : 'MISS' }}</strong></td>
+              <td><strong>{{ row.racetrackShortName }}</strong><br><small>{{ row.racetrackBaseline.toFixed(1) }}% baseline</small></td>
+              <td><strong :class="row.racetrackHit ? 'hit' : 'miss'">{{ row.racetrackHit ? 'HIT' : 'MISS' }}</strong></td>
             </tr>
           </tbody>
         </table>
       </div>
-      <p class="disclaimer">Een hoge historische hit-rate bewijst geen voorspellend voordeel. Bij kleine steekproeven kan toevalsvariantie zeer groot zijn; gebruik vooral langere reeksen om het model te beoordelen.</p>
+      <p class="disclaimer">De racetrack-groepen hebben verschillende aantallen nummers. Daarom vergelijken we niet met één vaste baseline, maar met de dekking van de groep die op elke historische spin daadwerkelijk geadviseerd werd.</p>
     </section>
 
     <section v-if="history.length" class="card history-card">

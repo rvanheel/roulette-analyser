@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
-import { analyse, parseNumbers, rouletteColor, sectorOf, type Sector } from './roulette'
+import { analyse, backtest, parseNumbers, rouletteColor, sectorOf, type Sector } from './roulette'
 
 const STORAGE_KEY = 'roulette-analyser-history-v1'
 const defaultHistory = [13,29,30,1,18,3,16,32,22,13,28,8,9,34,28,1]
@@ -10,10 +10,13 @@ const bulkInput = ref(history.value.join('-'))
 const nextNumber = ref('')
 const error = ref('')
 const prediction = computed(() => analyse(history.value))
+const backtestResult = computed(() => backtest(history.value, 5))
+const recentBacktestRows = computed(() => backtestResult.value.rows.slice(-12).reverse())
 
 watch(history, value => localStorage.setItem(STORAGE_KEY, JSON.stringify(value)), { deep: true })
 
 const sectorClass = (sector: Sector) => `sector-${sector.toLowerCase()}`
+const signed = (value: number) => `${value >= 0 ? '+' : ''}${value.toFixed(1)}`
 
 function applyHistory() {
   try {
@@ -120,6 +123,60 @@ function reset() {
           <small>{{ stat.count }}× waargenomen</small>
         </div>
       </div>
+    </section>
+
+    <section v-if="backtestResult.predictions" class="card backtest-card">
+      <div class="card-title-row">
+        <div><p class="label">Walk-forward backtest</p><h2>Prestaties op historische spins</h2></div>
+        <span class="muted">vanaf 5 trainingsspins · geen future leakage</span>
+      </div>
+
+      <div class="backtest-kpis">
+        <div class="kpi hero-kpi">
+          <span class="muted">5-getallen hit-rate</span>
+          <strong>{{ backtestResult.hitRate.toFixed(1) }}%</strong>
+          <small>{{ backtestResult.hits }} hits / {{ backtestResult.predictions }} voorspellingen</small>
+        </div>
+        <div class="kpi">
+          <span class="muted">Willekeurige 5 baseline</span>
+          <strong>{{ backtestResult.randomHitRate.toFixed(2) }}%</strong>
+          <small>5 / 37 per spin</small>
+        </div>
+        <div class="kpi" :class="backtestResult.percentagePointDelta >= 0 ? 'positive' : 'negative'">
+          <span class="muted">Verschil</span>
+          <strong>{{ signed(backtestResult.percentagePointDelta) }} pp</strong>
+          <small>{{ backtestResult.relativeLift.toFixed(2) }}× baseline</small>
+        </div>
+        <div class="kpi">
+          <span class="muted">Sector geraakt</span>
+          <strong>{{ backtestResult.sectorHitRate.toFixed(1) }}%</strong>
+          <small>{{ backtestResult.sectorHits }} van {{ backtestResult.predictions }}</small>
+        </div>
+      </div>
+
+      <div class="baseline-track">
+        <div class="baseline-labels"><span>Random {{ backtestResult.randomHitRate.toFixed(2) }}%</span><span>Model {{ backtestResult.hitRate.toFixed(1) }}%</span></div>
+        <div class="baseline-bar">
+          <i class="random-mark" :style="{ left: `${Math.min(backtestResult.randomHitRate, 100)}%` }" />
+          <b :style="{ width: `${Math.min(backtestResult.hitRate, 100)}%` }" />
+        </div>
+        <p class="hint">Bij {{ backtestResult.predictions }} voorspellingen verwacht willekeurig kiezen gemiddeld {{ backtestResult.expectedRandomHits.toFixed(1) }} hits.</p>
+      </div>
+
+      <div class="backtest-table-wrap">
+        <table class="backtest-table">
+          <thead><tr><th>Werkelijk</th><th>Voorspeld</th><th>5-zone</th><th>Resultaat</th></tr></thead>
+          <tbody>
+            <tr v-for="row in recentBacktestRows" :key="row.index">
+              <td><span class="mini-ball table-ball" :class="`num-${rouletteColor(row.actual)}`">{{ row.actual }}</span> <small>{{ row.actualSector }}</small></td>
+              <td><span class="sector-badge" :class="sectorClass(row.predictedSector)">{{ row.predictedSector }}</span></td>
+              <td class="zone-cell"><span v-for="n in row.numbers" :key="n" :class="{ 'zone-center': n === row.center }">{{ n }}</span></td>
+              <td><strong :class="row.hit ? 'hit' : 'miss'">{{ row.hit ? 'HIT' : 'MISS' }}</strong></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <p class="disclaimer">Een hoge historische hit-rate bewijst geen voorspellend voordeel. Bij kleine steekproeven kan toevalsvariantie zeer groot zijn; gebruik vooral langere reeksen om het model te beoordelen.</p>
     </section>
 
     <section v-if="history.length" class="card history-card">
